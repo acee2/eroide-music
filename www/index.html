@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1b1030"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png">
+<title>Eroide Music</title>
+<style>
+:root{--bg:#1b1030;--bg2:#271846;--fg:#f2eef7;--mu:#a99bc4;--ac:#ffb547;--li:#c9b6ff;--sa:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--fg);font:16px/1.4 "Avenir Next",Avenir,"Segoe UI",system-ui,sans-serif}
+#splash{position:fixed;inset:0;z-index:99;background:var(--bg);display:grid;place-items:center;transition:opacity .5s .9s,visibility 0s 1.4s}
+#splash.off{opacity:0;visibility:hidden}
+#splash svg{width:180px;height:120px}#splash .o{fill:none;stroke:var(--li);stroke-width:2;opacity:.5}
+#splash .d{fill:var(--ac);offset-path:ellipse(70px 32px at 90px 60px);animation:orb 1.4s cubic-bezier(.5,0,.3,1) forwards}
+#splash h1{position:absolute;margin-top:150px;font-weight:300;letter-spacing:.3em;font-size:18px;animation:fi .8s .4s both}
+@keyframes orb{from{offset-distance:0%}to{offset-distance:100%}}@keyframes fi{from{opacity:0}}
+header{padding:calc(env(safe-area-inset-top,0px) + 14px) 18px 6px}
+header h2{font-size:30px;font-weight:600;letter-spacing:-.02em}
+#search{display:none;margin:8px 18px 0}#search input{width:100%;padding:12px 16px;border-radius:14px;border:0;background:var(--bg2);color:var(--fg);font-size:16px}
+main{position:absolute;inset:0;overflow:auto;padding:90px 0 calc(150px + var(--sa))}
+main.s{padding-top:150px}
+.row{display:flex;gap:12px;align-items:center;padding:8px 18px}
+.row img{width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--bg2)}
+.row .t{flex:1;min-width:0}.row b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row small{color:var(--mu)}.row.on b{color:var(--ac)}
+.ic{background:none;border:0;color:var(--li);font-size:22px;padding:8px;min-width:40px}
+.empty{padding:40px 18px;color:var(--mu)}
+h3{padding:18px 18px 4px;font-weight:600;color:var(--li);font-size:15px}
+#mini{position:fixed;left:10px;right:10px;bottom:calc(66px + var(--sa));background:var(--bg2);border-radius:16px;padding:8px 10px;display:none;box-shadow:0 8px 30px #0008}
+#mini .row{padding:0}#mini input{width:100%;accent-color:var(--ac);margin-top:6px}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#150c26ee;backdrop-filter:blur(14px);padding-bottom:var(--sa);border-top:1px solid #ffffff14}
+nav button{flex:1;background:none;border:0;color:var(--mu);padding:12px 0 10px;font-size:12px}
+nav button.a{color:var(--ac)}nav i{display:block;font-style:normal;font-size:21px}
+input.u{width:calc(100% - 36px);margin:6px 18px;padding:12px;border-radius:12px;border:0;background:var(--bg2);color:var(--fg)}
+</style></head><body>
+<div id="splash"><svg viewBox="0 0 180 120"><ellipse class="o" cx="90" cy="60" rx="70" ry="32"/><circle class="d" r="7"/></svg><h1>EROIDE</h1></div>
+<header><h2 id="ttl"></h2></header>
+<div id="search"><input id="q" type="search" placeholder="Brani, artisti" enterkeyhint="search"></div>
+<main id="m"></main>
+<div id="mini"><div class="row"><img id="mi"><div class="t"><b id="mt"></b><small id="ma"></small></div>
+<button class="ic" id="pv">⏮</button><button class="ic" id="pp">▶</button><button class="ic" id="nx">⏭</button></div><input id="sk" type="range" min="0" max="100" value="0"></div>
+<nav id="nav"><button data-v="home"><i>⌂</i>Home</button><button data-v="search"><i>⌕</i>Cerca</button><button data-v="lib"><i>♫</i>Playlist</button><button data-v="set"><i>⚙</i>Server</button></nav>
+<audio id="au" preload="auto"></audio>
+<script>
+const $=s=>document.querySelector(s),au=$('#au'),m=$('#m');
+const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},SV=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+let inst=LS('inst','https://inv.nadeko.net'),pls=LS('pls',{Preferiti:[]}),dls=LS('dls',{}),queue=[],qi=-1,cur=null,view='home';
+const api=async p=>{const r=await fetch(inst+p);if(!r.ok)throw Error(r.status);return r.json()};
+const norm=v=>({id:v.videoId,title:v.title,author:v.author,thumb:`${inst}/vi/${v.videoId}/mqdefault.jpg`});
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function list(items,ctx){queue=items;m.innerHTML=items.length?items.map((t,i)=>`<div class="row ${cur&&cur.id==t.id?'on':''}" data-i="${i}"><img src="${t.thumb}" loading="lazy"><div class="t"><b>${esc(t.title)}</b><small>${esc(t.author)}${dls[t.id]?' · scaricato':''}</small></div><button class="ic" data-a="pl">＋</button><button class="ic" data-a="dl">${dls[t.id]?'✓':'⤓'}</button></div>`).join(''):'<div class="empty">Niente da mostrare qui.</div>'}
+m.onclick=e=>{const r=e.target.closest('.row');if(!r)return;const i=+r.dataset.i,t=queue[i],a=e.target.dataset.a;
+ if(a=='pl')return addPl(t);if(a=='dl')return download(t);if(r.dataset.i!==undefined)play(i);
+ if(r.dataset.pl)openPl(r.dataset.pl)};
+async function load(v){view=v;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('a',b.dataset.v==v));
+ $('#search').style.display=v=='search'?'block':'none';m.classList.toggle('s',v=='search');
+ $('#ttl').textContent={home:'Per te',search:'Cerca',lib:'Playlist',set:'Server'}[v];
+ if(v=='home'){m.innerHTML='<div class="empty">Carico i brani del momento…</div>';try{list((await api('/api/v1/trending?type=music')).slice(0,40).map(norm))}catch(e){err(e)}}
+ if(v=='search'){m.innerHTML='<div class="empty">Scrivi il nome di un brano o di un artista.</div>';$('#q').focus()}
+ if(v=='lib'){const d=Object.keys(dls);m.innerHTML=Object.keys(pls).map(n=>`<div class="row" data-pl="${esc(n)}"><div class="t"><b>${esc(n)}</b><small>${pls[n].length} brani</small></div></div>`).join('')+`<div class="row" data-pl="__dl"><div class="t"><b>Scaricati</b><small>${d.length} brani, ascolto offline</small></div></div><div class="row" data-np="1"><div class="t"><b style="color:var(--ac)">Nuova playlist</b></div></div>`;}
+ if(v=='set')m.innerHTML=`<h3>Istanza Invidious</h3><input class="u" id="in" value="${esc(inst)}"><div class="row"><button class="ic" id="sv" style="font-size:16px">Salva indirizzo</button></div><div class="empty">Inserisci l'indirizzo del tuo server Invidious. I brani scaricati restano salvati su questo dispositivo.</div>`}
+const err=e=>m.innerHTML=`<div class="empty">Non riesco a contattare ${esc(inst)} (${esc(e.message)}). Controlla l'indirizzo in Server.</div>`;
+function openPl(n){const items=n=='__dl'?Object.values(dls):pls[n];$('#ttl').textContent=n=='__dl'?'Scaricati':n;list(items)}
+m.addEventListener('click',e=>{const r=e.target.closest('.row');if(r&&r.dataset.np){const n=prompt('Nome della playlist');if(n){pls[n]=pls[n]||[];SV('pls',pls);load('lib')}}
+ if(e.target.id=='sv'){inst=$('#in').value.replace(/\/$/,'');SV('inst',inst);load('home')}});
+$('#nav').onclick=e=>{const b=e.target.closest('button');b&&load(b.dataset.v)};
+let tm;$('#q').oninput=e=>{clearTimeout(tm);tm=setTimeout(async()=>{const q=e.target.value.trim();if(!q)return;try{list((await api('/api/v1/search?type=video&q='+encodeURIComponent(q))).filter(v=>v.videoId).map(norm))}catch(x){err(x)}},400)};
+function addPl(t){const n=prompt('Aggiungi a quale playlist?\n'+Object.keys(pls).join(', '),'Preferiti');if(!n)return;pls[n]=pls[n]||[];if(!pls[n].some(x=>x.id==t.id))pls[n].push(t);SV('pls',pls)}
+const audioUrl=async id=>{const v=await api(`/api/v1/videos/${id}?local=true`);const f=v.adaptiveFormats.filter(x=>x.type.startsWith('audio'));const s=f.find(x=>x.itag==140)||f[0];return s.url.startsWith('http')?s.url:inst+s.url};
+async function download(t){if(dls[t.id])return;try{const r=await fetch(await audioUrl(t.id));const c=await caches.open('eroide-dl');await c.put('/dl/'+t.id,r);dls[t.id]=t;SV('dls',dls);if(view!='lib')list(queue)}catch(e){alert('Download non riuscito: '+e.message)}}
+async function play(i){qi=i;cur=queue[i];if(!cur)return;$('#mini').style.display='block';$('#mt').textContent=cur.title;$('#ma').textContent=cur.author;$('#mi').src=cur.thumb;
+ try{const hit=dls[cur.id]&&await caches.match('/dl/'+cur.id);au.src=hit?URL.createObjectURL(await hit.blob()):await audioUrl(cur.id);await au.play()}catch(e){alert('Riproduzione non riuscita: '+e.message)}
+ if('mediaSession'in navigator)navigator.mediaSession.metadata=new MediaMetadata({title:cur.title,artist:cur.author,artwork:[{src:cur.thumb,sizes:'320x180'}]});
+ document.querySelectorAll('.row[data-i]').forEach(r=>r.classList.toggle('on',+r.dataset.i==i))}
+const step=d=>queue.length&&play((qi+d+queue.length)%queue.length);
+$('#pp').onclick=()=>au.paused?au.play():au.pause();$('#nx').onclick=()=>step(1);$('#pv').onclick=()=>step(-1);
+au.onplay=()=>$('#pp').textContent='❚❚';au.onpause=()=>$('#pp').textContent='▶';au.onended=()=>step(1);
+au.ontimeupdate=()=>$('#sk').value=au.duration?au.currentTime/au.duration*100:0;$('#sk').oninput=e=>au.currentTime=au.duration*e.target.value/100;
+if('mediaSession'in navigator){const h=(a,f)=>navigator.mediaSession.setActionHandler(a,f);h('play',()=>au.play());h('pause',()=>au.pause());h('nexttrack',()=>step(1));h('previoustrack',()=>step(-1));h('seekto',d=>au.currentTime=d.seekTime)}
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+load('home');setTimeout(()=>$('#splash').classList.add('off'),1500);
+</script></body></html>
